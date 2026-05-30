@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>語意驅動型空間決策 Agent — 研究原型</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* 研究報告風格：淺色、可列印、低飽和 */
+    :root {
+      --bg: #f8f9fa;
+      --paper: #ffffff;
+      --border: #d1d5db;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --accent: #1e40af;
+      --path: #b91c1c;
+      --tree: #166534;
+      --wall: #4b5563;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Georgia", "Times New Roman", "Noto Serif TC", serif;
+      line-height: 1.55;
+      min-height: 100vh;
+    }
+
+    .sans { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+
+    .layout-table {
+      display: table;
+      width: 100%;
+      max-width: 1180px;
+      margin: 0 auto;
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+
+    .layout-row { display: table-row; }
+    .layout-cell {
+      display: table-cell;
+      vertical-align: top;
+      padding: 12px 16px;
+    }
+
+    .panel {
+      background: var(--paper);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+
+    .section-title {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+      margin-bottom: 12px;
+    }
+
+    .tag-btn, .mode-btn {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 13px;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .tag-btn:hover, .mode-btn:hover { background: #f3f4f6; }
+
+    .tag-btn.active, .mode-btn.active {
+      border-color: var(--accent);
+      background: #eff6ff;
+      color: var(--accent);
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 4px;
+      background: #e5e7eb;
+      border-radius: 2px;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 2px solid #fff;
+      box-shadow: 0 0 0 1px var(--border);
+      cursor: pointer;
+    }
+
+    .param-input {
+      width: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 13px;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 5px 8px;
+      background: #fff;
+    }
+
+    #parkCanvas {
+      display: block;
+      background: #fff;
+      border: 1px solid var(--border);
+    }
+
+    .figure-caption {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 8px;
+      text-align: center;
+      font-style: italic;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    .legend span::before {
+      content: "";
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      margin-right: 4px;
+      vertical-align: -2px;
+      border: 1px solid var(--border);
+    }
+
+    .legend .lg-path::before { background: var(--path); border-color: #991b1b; }
+    .legend .lg-start::before { background: #16a34a; border-radius: 50%; }
+    .legend .lg-end::before { background: var(--accent); }
+    .legend .lg-tree::before { background: rgba(22, 101, 52, 0.25); }
+    .legend .lg-wall::before { background: #9ca3af; }
+
+    .stat-card {
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 12px 16px;
+      background: #fafafa;
+      text-align: center;
+      min-width: 120px;
+    }
+
+    .stat-value {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    #pathStatus {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 3px;
+      margin-top: 8px;
+    }
+
+    #pathStatus.ok { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+    #pathStatus.fail { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+
+    @media print {
+      body { background: #fff; }
+      .no-print { display: none !important; }
+      .panel { box-shadow: none; }
+    }
+  </style>
+</head>
+<body class="pb-10">
+  <header class="max-w-[1180px] mx-auto px-4 pt-8 pb-4 border-b border-gray-300">
+    <p class="sans text-xs text-gray-500 mb-1">研究原型 · Figure 1</p>
+    <h1 class="text-2xl font-normal text-gray-900">語意驅動型空間決策與路徑生成</h1>
+    <p class="sans text-sm text-gray-600 mt-2 max-w-3xl">
+      100×100 網格公園模型 · A* 語意加權尋路 · 可調參數與最終路徑視覺化（適合嵌入研究報告截圖）
+    </p>
+  </header>
+
+  <div class="layout-table">
+    <div class="layout-row">
+      <!-- 左：控制與參數 -->
+      <div class="layout-cell" style="width: 340px;">
+        <div class="panel p-4 mb-3">
+          <div class="section-title">語意情境預設</div>
+          <div class="flex flex-col gap-2 sans">
+            <button type="button" class="tag-btn rounded py-2 px-3" data-preset="summer">夏天散步（遮陰優先）</button>
+            <button type="button" class="tag-btn rounded py-2 px-3" data-preset="date">私密約會（隱私優先）</button>
+            <button type="button" class="tag-btn rounded py-2 px-3" data-preset="rush">快速通關（舒服／少轉彎）</button>
+          </div>
+        </div>
+
+        <div class="panel p-4 mb-3">
+          <div class="section-title">語意權重 (0–100)</div>
+          <div class="space-y-3 sans text-sm">
+            <label class="block text-gray-600">
+              舒服度 <span id="valComfort" class="float-right font-medium text-gray-900">50</span>
+              <input type="range" id="sliderComfort" min="0" max="100" value="50" class="mt-1" />
+            </label>
+            <label class="block text-gray-600">
+              隱私感 <span id="valPrivacy" class="float-right font-medium text-gray-900">50</span>
+              <input type="range" id="sliderPrivacy" min="0" max="100" value="50" class="mt-1" />
+            </label>
+            <label class="block text-gray-600">
+              遮陰率 <span id="valShade" class="float-right font-medium text-gray-900">50</span>
+              <input type="range" id="sliderShade" min="0" max="100" value="50" class="mt-1" />
+            </label>
+          </div>
+        </div>
+
+        <div class="panel p-4 mb-3">
+          <div class="section-title">自訂參數</div>
+          <div class="grid grid-cols-2 gap-2 sans text-sm">
+            <label class="text-gray-600 col-span-2 text-xs">起點座標 (x, y)</label>
+            <input type="number" id="paramStartX" class="param-input" min="0" max="99" value="5" />
+            <input type="number" id="paramStartY" class="param-input" min="0" max="99" value="5" />
+            <label class="text-gray-600 col-span-2 text-xs mt-1">終點座標 (x, y)</label>
+            <input type="number" id="paramEndX" class="param-input" min="0" max="99" value="95" />
+            <input type="number" id="paramEndY" class="param-input" min="0" max="99" value="95" />
+            <label class="text-gray-600 col-span-2 text-xs mt-1">樹冠半徑（格）</label>
+            <input type="number" id="paramTreeR" class="param-input col-span-2" min="2" max="20" value="8" />
+            <label class="text-gray-600 col-span-2 text-xs mt-1">代價係數 k<sub>轉彎</sub></label>
+            <input type="number" id="paramKTurn" class="param-input col-span-2" min="0" max="20" step="0.5" value="4" />
+            <label class="text-gray-600 col-span-2 text-xs mt-1">代價係數 k<sub>隱私</sub></label>
+            <input type="number" id="paramKPrivacy" class="param-input col-span-2" min="0" max="20" step="0.5" value="3" />
+            <label class="text-gray-600 col-span-2 text-xs mt-1">代價係數 k<sub>遮陰</sub></label>
+            <input type="number" id="paramKShade" class="param-input col-span-2" min="0" max="20" step="0.5" value="3" />
+            <label class="text-gray-600 col-span-2 text-xs mt-1">圍牆距離正規化（格）</label>
+            <input type="number" id="paramWallDiv" class="param-input col-span-2" min="1" max="30" value="12" />
+          </div>
+          <button type="button" id="btnApplyParams" class="sans w-full mt-3 py-2 text-sm bg-gray-900 text-white rounded hover:bg-gray-800">
+            套用參數並重算路徑
+          </button>
+          <p class="sans text-xs text-gray-500 mt-2">
+            移動代價：Cost = 1 + w<sub>舒服</sub>·k<sub>轉彎</sub>·轉彎 + w<sub>隱私</sub>·k<sub>隱私</sub>·遠牆 + w<sub>遮陰</sub>·k<sub>遮陰</sub>·曝曬
+          </p>
+        </div>
+
+        <div class="panel p-4 no-print">
+          <div class="section-title">地圖編輯</div>
+          <div class="flex flex-wrap gap-2 sans">
+            <button type="button" class="mode-btn rounded px-3 py-1.5 active" data-mode="view">檢視</button>
+            <button type="button" class="mode-btn rounded px-3 py-1.5" data-mode="tree">放置樹木</button>
+            <button type="button" class="mode-btn rounded px-3 py-1.5" data-mode="wall">放置圍牆</button>
+          </div>
+          <p id="perfHint" class="sans text-xs text-gray-500 mt-3">運算時間：—</p>
+        </div>
+      </div>
+
+      <!-- 右：圖表 -->
+      <div class="layout-cell">
+        <div class="panel p-4">
+          <div class="section-title mb-3">空間配置與最終路徑</div>
+          <canvas id="parkCanvas" width="500" height="500"></canvas>
+          <p class="figure-caption">
+            圖 1. 公園網格（100×100）：綠色區域為樹冠遮陰、灰色為圍牆障礙；
+            <strong class="text-red-800 not-italic">紅色實線與格點</strong>為 A* 計算之<strong>最終路徑</strong>。
+          </p>
+          <div class="legend">
+            <span class="lg-path">最終路徑</span>
+            <span class="lg-start">起點</span>
+            <span class="lg-end">終點</span>
+            <span class="lg-tree">樹冠</span>
+            <span class="lg-wall">圍牆</span>
+          </div>
+          <div id="pathStatus" class="ok">路徑狀態：計算中…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 報告區 -->
+  <section class="max-w-[1180px] mx-auto px-4 mt-2">
+    <div class="panel p-5">
+      <div class="section-title">決策說明（Agent 摘要）</div>
+      <p id="agentNarrative" class="text-sm text-gray-800 mb-4 pl-3 border-l-4 border-blue-800">
+        正在初始化…
+      </p>
+      <div class="flex flex-wrap gap-3 sans">
+        <div class="stat-card">
+          <div class="text-xs text-gray-500 uppercase">路徑總長度</div>
+          <div class="stat-value" id="statLength">—</div>
+          <div class="text-xs text-gray-500">格</div>
+        </div>
+        <div class="stat-card">
+          <div class="text-xs text-gray-500 uppercase">轉折數</div>
+          <div class="stat-value" id="statTurns">—</div>
+          <div class="text-xs text-gray-500">次</div>
+        </div>
+        <div class="stat-card">
+          <div class="text-xs text-gray-500 uppercase">路徑遮陰率</div>
+          <div class="stat-value" id="statShade">—</div>
+          <div class="text-xs text-gray-500">%</div>
+        </div>
+        <div class="stat-card">
+          <div class="text-xs text-gray-500 uppercase">路徑節點數</div>
+          <div class="stat-value" id="statNodes">—</div>
+          <div class="text-xs text-gray-500">用於驗證繪製</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    (function () {
+      'use strict';
+
+      const GRID = 100;
+      const CELL_PX = 5;
+      const DIRS = [
+        { dx: 0, dy: 1, id: 0 },
+        { dx: 1, dy: 0, id: 1 },
+        { dx: 0, dy: -1, id: 2 },
+        { dx: -1, dy: 0, id: 3 }
+      ];
+
+      const canvas = document.getElementById('parkCanvas');
+      const ctx = canvas.getContext('2d');
+
+      let trees = [];
+      let walls = [];
+      let path = null;
+      let editMode = 'view';
+
+      const weights = { comfort: 50, privacy: 50, shade: 50 };
+
+      const config = {
+        startX: 5, startY: 5,
+        endX: 95, endY: 95,
+        treeR: 8,
+        kTurn: 4,
+        kPrivacy: 3,
+        kShade: 3,
+        wallDiv: 12
+      };
+
+      function getStart() { return { x: config.startX, y: config.startY }; }
+      function getEnd() { return { x: config.endX, y: config.endY }; }
+
+      /** 修正：避免 (x<<7)|(y<<7) 座標碰撞 */
+      function stateKey(x, y, dir) {
+        return (x * GRID + y) * 8 + dir;
+      }
+
+      function initDefaultMap() {
+        const r = config.treeR;
+        trees = [
+          { x: 25, y: 30, r },
+          { x: 45, y: 55, r },
+          { x: 60, y: 25, r },
+          { x: 70, y: 65, r },
+          { x: 35, y: 75, r }
+        ];
+        walls = [
+          { x: 50, y: 40, w: 18, h: 3 },
+          { x: 20, y: 50, w: 3, h: 22 },
+          { x: 75, y: 45, w: 3, h: 20 }
+        ];
+      }
+
+      function readParamsFromUI() {
+        config.startX = clampInt('paramStartX', 0, 99, 5);
+        config.startY = clampInt('paramStartY', 0, 99, 5);
+        config.endX = clampInt('paramEndX', 0, 99, 95);
+        config.endY = clampInt('paramEndY', 0, 99, 95);
+        config.treeR = clampInt('paramTreeR', 2, 20, 8);
+        config.kTurn = clampFloat('paramKTurn', 0, 20, 4);
+        config.kPrivacy = clampFloat('paramKPrivacy', 0, 20, 3);
+        config.kShade = clampFloat('paramKShade', 0, 20, 3);
+        config.wallDiv = clampInt('paramWallDiv', 1, 30, 12);
+
+        const s = getStart();
+        const e = getEnd();
+        if (s.x === e.x && s.y === e.y) {
+          alert('起點與終點不可相同，請調整座標。');
+          return false;
+        }
+        trees.forEach(t => { t.r = config.treeR; });
+        return true;
+      }
+
+      function clampInt(id, min, max, fallback) {
+        const el = document.getElementById(id);
+        let v = parseInt(el.value, 10);
+        if (Number.isNaN(v)) v = fallback;
+        v = Math.max(min, Math.min(max, v));
+        el.value = v;
+        return v;
+      }
+
+      function clampFloat(id, min, max, fallback) {
+        const el = document.getElementById(id);
+        let v = parseFloat(el.value);
+        if (Number.isNaN(v)) v = fallback;
+        v = Math.max(min, Math.min(max, v));
+        el.value = v;
+        return v;
+      }
+
+      function inBounds(x, y) {
+        return x >= 0 && x < GRID && y >= 0 && y < GRID;
+      }
+
+      function isWallCell(x, y) {
+        for (const w of walls) {
+          if (x >= w.x && x < w.x + w.w && y >= w.y && y < w.y + w.h) return true;
+        }
+        return false;
+      }
+
+      function isBlocked(x, y) {
+        if (!inBounds(x, y)) return true;
+        const s = getStart();
+        const e = getEnd();
+        if (x === s.x && y === s.y) return false;
+        if (x === e.x && y === e.y) return false;
+        return isWallCell(x, y);
+      }
+
+      function isInShade(x, y) {
+        for (const t of trees) {
+          const dx = x - t.x;
+          const dy = y - t.y;
+          if (dx * dx + dy * dy <= t.r * t.r) return true;
+        }
+        return false;
+      }
+
+      function distPointToSegment(px, py, x1, y1, x2, y2) {
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        if (dx === 0 && dy === 0) return Math.hypot(px - x1, py - y1);
+        let t = ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy);
+        t = Math.max(0, Math.min(1, t));
+        return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+      }
+
+      function distToWall(x, y, w) {
+        const left = w.x, right = w.x + w.w - 1, top = w.y, bottom = w.y + w.h - 1;
+        const segs = [[left, top, right, top], [right, top, right, bottom], [right, bottom, left, bottom], [left, bottom, left, top]];
+        let minD = Infinity;
+        for (const s of segs) {
+          minD = Math.min(minD, distPointToSegment(x + 0.5, y + 0.5, s[0], s[1], s[2], s[3]));
+        }
+        const cx = Math.max(left, Math.min(x, right));
+        const cy = Math.max(top, Math.min(y, bottom));
+        if (x >= left && x <= right && y >= top && y <= bottom) return 0;
+        return Math.min(minD, Math.hypot(x - cx, y - cy));
+      }
+
+      function nearestWallDistance(x, y) {
+        if (!walls.length) return config.wallDiv;
+        let d = Infinity;
+        for (const w of walls) d = Math.min(d, distToWall(x, y, w));
+        return d;
+      }
+
+      function stepCost(x, y, prevDir, newDir) {
+        const wC = weights.comfort / 100;
+        const wP = weights.privacy / 100;
+        const wS = weights.shade / 100;
+
+        let turnPenalty = 0;
+        if (prevDir >= 0 && prevDir !== newDir) {
+          turnPenalty = weights.comfort >= 70 ? 3 : 1;
+        }
+
+        const farFromWall = Math.min(nearestWallDistance(x, y) / config.wallDiv, 1);
+        const sunExposure = isInShade(x, y) ? 0 : 1;
+
+        return 1
+          + wC * turnPenalty * config.kTurn
+          + wP * farFromWall * config.kPrivacy
+          + wS * sunExposure * config.kShade;
+      }
+
+      class MinHeap {
+        constructor() { this.data = []; }
+        push(n) { this.data.push(n); this._bubble(this.data.length - 1); }
+        pop() {
+          if (!this.data.length) return null;
+          const top = this.data[0];
+          const last = this.data.pop();
+          if (this.data.length) { this.data[0] = last; this._sink(0); }
+          return top;
+        }
+        _bubble(i) {
+          while (i > 0) {
+            const p = (i - 1) >> 1;
+            if (this.data[p].f <= this.data[i].f) break;
+            [this.data[p], this.data[i]] = [this.data[i], this.data[p]];
+            i = p;
+          }
+        }
+        _sink(i) {
+          const n = this.data.length;
+          while (true) {
+            let s = i, l = i * 2 + 1, r = l + 1;
+            if (l < n && this.data[l].f < this.data[s].f) s = l;
+            if (r < n && this.data[r].f < this.data[s].f) s = r;
+            if (s === i) break;
+            [this.data[s], this.data[i]] = [this.data[i], this.data[s]];
+            i = s;
+          }
+        }
+      }
+
+      function heuristic(x, y) {
+        const e = getEnd();
+        return Math.abs(x - e.x) + Math.abs(y - e.y);
+      }
+
+      function astar() {
+        const s = getStart();
+        const e = getEnd();
+        const open = new MinHeap();
+        const gScore = new Map();
+        const cameFrom = new Map();
+        const startKey = stateKey(s.x, s.y, 4);
+        gScore.set(startKey, 0);
+        open.push({ x: s.x, y: s.y, dir: -1, f: heuristic(s.x, s.y) });
+
+        const closed = new Set();
+
+        while (open.data.length) {
+          const cur = open.pop();
+          const cKey = stateKey(cur.x, cur.y, cur.dir < 0 ? 4 : cur.dir);
+          if (closed.has(cKey)) continue;
+          closed.add(cKey);
+
+          if (cur.x === e.x && cur.y === e.y) {
+            return reconstruct(cameFrom, cur);
+          }
+
+          for (const d of DIRS) {
+            const nx = cur.x + d.dx;
+            const ny = cur.y + d.dy;
+            if (isBlocked(nx, ny)) continue;
+
+            const cost = stepCost(nx, ny, cur.dir, d.id);
+            const tentative = (gScore.get(cKey) ?? Infinity) + cost;
+            const nKey = stateKey(nx, ny, d.id);
+            if (tentative >= (gScore.get(nKey) ?? Infinity)) continue;
+
+            gScore.set(nKey, tentative);
+            cameFrom.set(nKey, { x: cur.x, y: cur.y, dir: cur.dir });
+            open.push({ x: nx, y: ny, dir: d.id, f: tentative + heuristic(nx, ny) });
+          }
+        }
+        return null;
+      }
+
+      function reconstruct(cameFrom, endNode) {
+        const pts = [{ x: endNode.x, y: endNode.y }];
+        let key = stateKey(endNode.x, endNode.y, endNode.dir);
+        let guard = GRID * GRID * 8;
+        while (guard-- > 0) {
+          const prev = cameFrom.get(key);
+          if (!prev) break;
+          pts.push({ x: prev.x, y: prev.y });
+          key = stateKey(prev.x, prev.y, prev.dir < 0 ? 4 : prev.dir);
+        }
+        pts.reverse();
+        return pts.length >= 2 ? pts : null;
+      }
+
+      function countTurns(pts) {
+        if (!pts || pts.length < 3) return 0;
+        let turns = 0;
+        let pdx = pts[1].x - pts[0].x, pdy = pts[1].y - pts[0].y;
+        for (let i = 2; i < pts.length; i++) {
+          const dx = pts[i].x - pts[i - 1].x;
+          const dy = pts[i].y - pts[i - 1].y;
+          if (dx !== pdx || dy !== pdy) turns++;
+          pdx = dx; pdy = dy;
+        }
+        return turns;
+      }
+
+      function pathShadePercent(pts) {
+        if (!pts?.length) return 0;
+        let n = 0;
+        for (const p of pts) if (isInShade(p.x, p.y)) n++;
+        return Math.round((n / pts.length) * 100);
+      }
+
+      function buildNarrative(pts, turns, shadePct, ms) {
+        const s = getStart();
+        const e = getEnd();
+        if (!pts) {
+          return `在現有圍牆配置下，演算法無法從 (${s.x},${s.y}) 連通至 (${e.x},${e.y})。建議降低圍牆密度或調整起終點後重新計算。`;
+        }
+        const persona = weights.shade >= 80 ? '遮陰優先'
+          : weights.privacy >= 80 ? '隱私優先'
+          : weights.comfort >= 80 ? '少轉彎（接近最短路）' : '多目標平衡';
+
+        return [
+          `本輪採用「${persona}」語意權重（舒服 ${weights.comfort}、隱私 ${weights.privacy}、遮陰 ${weights.shade}），`,
+          `於 ${ms.toFixed(2)} ms 內完成 A* 求解。最終路徑含 ${pts.length} 個網格節點、${turns} 次轉折，`,
+          `沿途遮陰覆蓋率約 ${shadePct}%。`,
+          `自訂係數：k_turn=${config.kTurn}，k_privacy=${config.kPrivacy}，k_shade=${config.kShade}，牆距正規化=${config.wallDiv} 格。`,
+          `圖 1 紅色標示為可供報告引用的最終路徑。`
+        ].join('');
+      }
+
+      function drawPathCells(pts) {
+        ctx.fillStyle = 'rgba(185, 28, 28, 0.28)';
+        for (const p of pts) {
+          ctx.fillRect(p.x * CELL_PX + 0.5, p.y * CELL_PX + 0.5, CELL_PX - 1, CELL_PX - 1);
+        }
+      }
+
+      function drawPathLine(pts) {
+        ctx.save();
+        ctx.strokeStyle = '#b91c1c';
+        ctx.lineWidth = 2.5;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        for (let i = 0; i < pts.length; i++) {
+          const px = pts[i].x * CELL_PX + CELL_PX / 2;
+          const py = pts[i].y * CELL_PX + CELL_PX / 2;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.fillStyle = '#b91c1c';
+        for (let i = 0; i < pts.length; i += Math.max(1, Math.floor(pts.length / 12))) {
+          const px = pts[i].x * CELL_PX + CELL_PX / 2;
+          const py = pts[i].y * CELL_PX + CELL_PX / 2;
+          ctx.beginPath();
+          ctx.arc(px, py, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      function draw() {
+        const s = getStart();
+        const e = getEnd();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, 500, 500);
+
+        ctx.strokeStyle = '#e5e7eb';
+        ctx.lineWidth = 0.5;
+        for (let i = 0; i <= GRID; i += 10) {
+          const p = i * CELL_PX;
+          ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, 500); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(0, p); ctx.lineTo(500, p); ctx.stroke();
+        }
+
+        for (const t of trees) {
+          const cx = t.x * CELL_PX + CELL_PX / 2;
+          const cy = t.y * CELL_PX + CELL_PX / 2;
+          const r = t.r * CELL_PX;
+          ctx.fillStyle = 'rgba(22, 101, 52, 0.18)';
+          ctx.strokeStyle = 'rgba(22, 101, 52, 0.55)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+
+        for (const w of walls) {
+          ctx.fillStyle = 'rgba(107, 114, 128, 0.45)';
+          ctx.strokeStyle = '#4b5563';
+          ctx.lineWidth = 1;
+          ctx.fillRect(w.x * CELL_PX, w.y * CELL_PX, w.w * CELL_PX, w.h * CELL_PX);
+          ctx.strokeRect(w.x * CELL_PX + 0.5, w.y * CELL_PX + 0.5, w.w * CELL_PX - 1, w.h * CELL_PX - 1);
+        }
+
+        if (path && path.length >= 2) {
+          drawPathCells(path);
+          drawPathLine(path);
+        }
+
+        function marker(pt, fill, stroke, shape) {
+          const px = pt.x * CELL_PX + CELL_PX / 2;
+          const py = pt.y * CELL_PX + CELL_PX / 2;
+          ctx.fillStyle = fill;
+          ctx.strokeStyle = stroke;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          if (shape === 'square') {
+            ctx.rect(px - 5, py - 5, 10, 10);
+          } else {
+            ctx.arc(px, py, 5, 0, Math.PI * 2);
+          }
+          ctx.fill();
+          ctx.stroke();
+        }
+
+        marker(s, '#16a34a', '#14532d', 'circle');
+        marker(e, '#1e40af', '#1e3a8a', 'square');
+      }
+
+      function updatePathStatus() {
+        const el = document.getElementById('pathStatus');
+        const s = getStart();
+        const e = getEnd();
+        if (path && path.length >= 2) {
+          el.className = 'ok';
+          el.textContent = `路徑狀態：已找到最終路徑（${path.length} 節點）· 起點(${s.x},${s.y}) → 終點(${e.x},${e.y})`;
+        } else {
+          el.className = 'fail';
+          el.textContent = '路徑狀態：無可行路徑，請調整圍牆或起終點';
+        }
+      }
+
+      function recompute() {
+        const t0 = performance.now();
+        path = astar();
+        const ms = performance.now() - t0;
+
+        const turns = path ? countTurns(path) : 0;
+        const shadePct = path ? pathShadePercent(path) : 0;
+
+        document.getElementById('statLength').textContent = path ? String(path.length) : '—';
+        document.getElementById('statTurns').textContent = path ? String(turns) : '—';
+        document.getElementById('statShade').textContent = path ? String(shadePct) : '—';
+        document.getElementById('statNodes').textContent = path ? String(path.length) : '0';
+        document.getElementById('agentNarrative').textContent = buildNarrative(path, turns, shadePct, ms);
+        document.getElementById('perfHint').textContent = `運算時間：${ms.toFixed(2)} ms`;
+        updatePathStatus();
+        draw();
+      }
+
+      let rafPending = false;
+      function scheduleUpdate() {
+        if (rafPending) return;
+        rafPending = true;
+        requestAnimationFrame(() => { rafPending = false; recompute(); });
+      }
+
+      function gridFromEvent(ev) {
+        const rect = canvas.getBoundingClientRect();
+        const sx = canvas.width / rect.width;
+        const sy = canvas.height / rect.height;
+        const cx = (ev.clientX - rect.left) * sx;
+        const cy = (ev.clientY - rect.top) * sy;
+        return { x: Math.floor(cx / CELL_PX), y: Math.floor(cy / CELL_PX) };
+      }
+
+      function findTreeAt(x, y) {
+        for (let i = 0; i < trees.length; i++) {
+          const t = trees[i];
+          if ((x - t.x) ** 2 + (y - t.y) ** 2 <= t.r * t.r) return i;
+        }
+        return -1;
+      }
+
+      function findWallAt(x, y) {
+        return walls.findIndex(w => x >= w.x && x < w.x + w.w && y >= w.y && y < w.y + w.h);
+      }
+
+      canvas.addEventListener('click', (ev) => {
+        if (editMode === 'view') return;
+        const { x, y } = gridFromEvent(ev);
+        if (!inBounds(x, y)) return;
+        const s = getStart(), e = getEnd();
+        if ((x === s.x && y === s.y) || (x === e.x && y === e.y)) return;
+
+        if (editMode === 'tree') {
+          const idx = findTreeAt(x, y);
+          if (idx >= 0) trees.splice(idx, 1);
+          else trees.push({ x, y, r: config.treeR });
+        } else {
+          const idx = findWallAt(x, y);
+          if (idx >= 0) walls.splice(idx, 1);
+          else walls.push({ x: Math.max(0, x - 1), y, w: 3, h: 1 });
+        }
+        scheduleUpdate();
+      });
+
+      const sliderComfort = document.getElementById('sliderComfort');
+      const sliderPrivacy = document.getElementById('sliderPrivacy');
+      const sliderShade = document.getElementById('sliderShade');
+
+      function syncSliders() {
+        document.getElementById('valComfort').textContent = weights.comfort;
+        document.getElementById('valPrivacy').textContent = weights.privacy;
+        document.getElementById('valShade').textContent = weights.shade;
+      }
+
+      function onWeightChange() {
+        weights.comfort = +sliderComfort.value;
+        weights.privacy = +sliderPrivacy.value;
+        weights.shade = +sliderShade.value;
+        syncSliders();
+        document.querySelectorAll('.tag-btn').forEach(b => b.classList.remove('active'));
+        scheduleUpdate();
+      }
+
+      [sliderComfort, sliderPrivacy, sliderShade].forEach(el => el.addEventListener('input', onWeightChange));
+
+      const PRESETS = {
+        summer: { comfort: 10, privacy: 10, shade: 90 },
+        date: { comfort: 10, privacy: 90, shade: 10 },
+        rush: { comfort: 90, privacy: 10, shade: 10 }
+      };
+
+      document.querySelectorAll('.tag-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const p = PRESETS[btn.dataset.preset];
+          if (!p) return;
+          weights.comfort = p.comfort;
+          weights.privacy = p.privacy;
+          weights.shade = p.shade;
+          sliderComfort.value = p.comfort;
+          sliderPrivacy.value = p.privacy;
+          sliderShade.value = p.shade;
+          syncSliders();
+          document.querySelectorAll('.tag-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          scheduleUpdate();
+        });
+      });
+
+      document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          editMode = btn.dataset.mode;
+          document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+        });
+      });
+
+      document.getElementById('btnApplyParams').addEventListener('click', () => {
+        if (readParamsFromUI()) scheduleUpdate();
+      });
+
+      ['paramStartX', 'paramStartY', 'paramEndX', 'paramEndY'].forEach(id => {
+        document.getElementById(id).addEventListener('change', () => {
+          if (readParamsFromUI()) scheduleUpdate();
+        });
+      });
+
+      initDefaultMap();
+      syncSliders();
+      recompute();
+    })();
+  </script>
+</body>
+</html>
