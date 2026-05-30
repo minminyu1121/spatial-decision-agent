@@ -43,42 +43,51 @@
 
     .sans { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 
-    /* 桌面：table 分欄；手機：直向堆疊 */
+    /* 左側參數、右側地圖（寬螢幕並排；極窄螢幕才上下堆疊） */
     .layout-table {
-      display: table;
       width: 100%;
       max-width: 1180px;
       margin: 0 auto;
-      border-collapse: separate;
-      border-spacing: 0;
     }
 
-    .layout-row { display: table-row; }
+    .layout-row {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+    }
+
     .layout-cell {
-      display: table-cell;
-      vertical-align: top;
       padding: 12px 16px;
+      min-width: 0;
     }
 
-    .cell-controls { width: 340px; }
-    .cell-canvas { width: auto; }
+    .cell-controls {
+      flex: 0 0 300px;
+      width: 300px;
+      max-width: 36%;
+      order: 1;
+    }
 
-    /* 手機：地圖優先、全寬、大按鈕 */
+    .cell-canvas {
+      flex: 1;
+      order: 2;
+    }
+
+    /* 手機：參數仍在上／左側優先，全寬大按鈕 */
     @media (max-width: 767px) {
-      .layout-table,
-      .layout-row,
+      .layout-row {
+        flex-direction: column;
+      }
+
       .layout-cell {
-        display: block;
         width: 100% !important;
+        max-width: none !important;
+        flex: none !important;
         padding: 8px 12px;
       }
 
-      .cell-canvas { order: -1; }
-
-      .layout-row {
-        display: flex;
-        flex-direction: column;
-      }
+      .cell-controls { order: 1; }
+      .cell-canvas { order: 2; }
 
       .page-header {
         padding-top: 1.25rem !important;
@@ -434,12 +443,12 @@
     <p class="header-desc sans text-sm text-gray-600 mt-2 max-w-3xl">
       100×100 網格公園 · A* 語意尋路 · 支援手機觸控操作
     </p>
-    <p class="mobile-scroll-hint sans">↓ 地圖在上方，設定在下方</p>
+    <p class="mobile-scroll-hint sans">↓ 參數調整在上方，地圖在下方</p>
   </header>
 
   <div class="layout-table">
     <div class="layout-row">
-      <!-- 左：控制與參數（手機版顯示在地圖下方） -->
+      <!-- 左：控制與參數 -->
       <div class="layout-cell cell-controls">
         <div class="panel panel-mobile-pad p-4 mb-3">
           <div class="section-title">語意情境預設</div>
@@ -509,7 +518,7 @@
         </div>
       </div>
 
-      <!-- 右：圖表（手機版 order 置頂） -->
+      <!-- 右：地圖與路徑 -->
       <div class="layout-cell cell-canvas">
         <div class="panel panel-mobile-pad p-4">
           <div class="section-title mb-3">空間配置與最終路徑</div>
